@@ -1,0 +1,79 @@
+# ================================================
+# VERCEL ENVIRONMENT VARIABLES
+# Copy/paste these into Vercel Dashboard
+# Project Settings → Environment Variables
+# ================================================
+
+# === APPLICATION ===
+# Replace with your actual Vercel URL after first deployment
+NEXT_PUBLIC_APP_URL=https://your-project-name.vercel.app
+
+
+# === STRIPE (PRODUCTION) ===
+# Get from: https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_live_YOUR_PRODUCTION_SECRET_KEY
+
+# Get from: https://dashboard.stripe.com/webhooks
+# Endpoint URL: https://your-project-name.vercel.app/api/webhook
+# Event: checkout.session.completed
+STRIPE_WEBHOOK_SECRET=whsec_YOUR_WEBHOOK_SECRET
+
+
+# === GOOGLE OAUTH ===
+# Get from: https://console.cloud.google.com/apis/credentials
+GOOGLE_OAUTH_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=YOUR_OAUTH_CLIENT_SECRET
+
+# Must match your Vercel URL
+GOOGLE_OAUTH_REDIRECT_URI=https://your-project-name.vercel.app/api/auth/google/callback
+
+# Get after first deployment:
+# 1. Deploy first with placeholder token
+# 2. Visit: https://your-project-name.vercel.app/api/auth/google/authorize
+# 3. Authorize and copy refresh_token
+# 4. Add it here and redeploy
+GOOGLE_OAUTH_REFRESH_TOKEN=YOUR_REFRESH_TOKEN_FROM_AUTHORIZE_FLOW
+
+
+# === GOOGLE DRIVE ===
+# Your main folder ID where client folders will be created
+# Example: https://drive.google.com/drive/folders/1ABC123DEF456
+# Folder ID: 1ABC123DEF456
+GOOGLE_DRIVE_FOLDER_ID=YOUR_GOOGLE_DRIVE_FOLDER_ID
+
+
+# === EMAIL (GMAIL) ===
+# Your Gmail address
+EMAIL_USER=your-email@gmail.com
+
+# Gmail App Password (NOT your regular password)
+# Get from: https://myaccount.google.com/apppasswords
+# 1. Enable 2FA
+# 2. Generate "Mail" app password
+# 3. Copy 16-character password (no spaces)
+EMAIL_PASSWORD=YOUR_16_CHAR_APP_PASSWORD
+
+# Where admin notifications will be sent
+ADMIN_EMAIL=admin@drsilaw.com
+
+
+# === MONDAY.COM (OPTIONAL) ===
+# Only add if you're using Monday.com integration
+# Get from: https://monday.com/ → Admin → API
+MONDAY_API_KEY=YOUR_MONDAY_API_KEY
+MONDAY_BOARD_ID=YOUR_BOARD_ID
+
+
+# ================================================
+# NOTES
+# ================================================
+#
+# 1. Add each variable separately in Vercel Dashboard
+# 2. Make sure to use PRODUCTION keys (not test/dev)
+# 3. After adding all variables, deploy/redeploy
+# 4. Update NEXT_PUBLIC_APP_URL after first deployment
+# 5. Complete OAuth flow to get refresh token
+# 6. Test everything after deployment
+#
+# ================================================
+
