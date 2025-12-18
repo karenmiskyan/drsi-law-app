@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     // Store signature separately (too large for Stripe metadata - max 500 chars)
     // We'll retrieve it from storage in the webhook
     const signatureId = `sig_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    storeSignature(signatureId, signature);
+    await storeSignature(signatureId, signature);
     console.log("✅ Signature stored with ID:", signatureId);
     
     // Create Stripe Checkout Session
@@ -106,4 +106,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

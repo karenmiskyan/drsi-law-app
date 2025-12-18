@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if already submitted (used=true)
-    const existing = hasExistingRegistration(email, phone);
+    const existing = await hasExistingRegistration(email, phone);
     if (existing) {
       console.log(`⚠️ Registration already submitted for ${email} (ID: ${existing.registrationId})`);
       return NextResponse.json(
@@ -32,14 +32,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Remove any old unused tokens for this email/phone (e.g., from previous Step 5 visit)
-    removeUnusedRegistration(email, phone);
+    await removeUnusedRegistration(email, phone);
 
     // Generate unique submission token
     const submissionToken = uuidv4();
     const registrationId = `REG-${uuidv4().substring(0, 8).toUpperCase()}`;
 
     // Store in database (not yet used)
-    addRegistration({
+    await addRegistration({
       registrationId,
       email,
       phone,
@@ -65,4 +65,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

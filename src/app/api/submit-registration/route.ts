@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // 1. Check if token exists and matches email/phone
     // 2. Check if token is not already used (!r.used)
     // 3. Mark token as used (r.used = true) to prevent reuse
-    const isValidToken = verifySubmissionToken(submissionToken, applicantInfo.email, applicantInfo.phone);
+    const isValidToken = await verifySubmissionToken(submissionToken, applicantInfo.email, applicantInfo.phone);
     if (!isValidToken) {
       console.error("❌ Invalid or already used submission token");
       return NextResponse.json(
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Mark registration as submitted in database
-    markRegistrationSubmitted(applicantInfo.email);
+    await markRegistrationSubmitted(applicantInfo.email);
 
     // 6. Send confirmation emails
     console.log("📧 Sending confirmation emails...");

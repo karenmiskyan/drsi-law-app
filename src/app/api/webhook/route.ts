@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
       } = metadata;
 
       // Retrieve signature from storage (don't delete yet - we'll use it multiple times)
-      const signature = signatureId ? getSignature(signatureId) : null;
-      if (!signature) {
+      const signatureData = signatureId ? await getSignature(signatureId) : null;
+      if (!signatureData) {
         console.warn("⚠️ Signature not found in storage for signatureId:", signatureId);
       } else {
         console.log("✅ Signature retrieved successfully");
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         phone,
         maritalStatus: maritalStatus as any,
         amount,
-        signature: signature || "", // Use empty string if signature not found
+        signature: signatureData || "", // Use empty string if signature not found
         date: new Date().toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
 
         // Save folder mapping to database for future registration submissions
         console.log("💾 Saving folder mapping to database...");
-        saveFolderMapping({
+        await saveFolderMapping({
           email,
           folderId: clientFolderId,
           folderName,
@@ -219,13 +219,13 @@ export async function POST(req: NextRequest) {
       }
 
       // 3.5 Upload Signature Image separately
-      if (signature && clientFolderId) {
+      if (signatureData && clientFolderId) {
         try {
           console.log("✍️ Uploading signature image to client folder...");
           
           // Convert base64 signature to buffer
           // Signature format: "data:image/png;base64,iVBORw0KG..."
-          const base64Data = signature.replace(/^data:image\/\w+;base64,/, "");
+          const base64Data = signatureData.replace(/^data:image\/\w+;base64,/, "");
           const signatureBuffer = Buffer.from(base64Data, "base64");
           
           const signatureFileName = `Signature_${firstName}_${lastName}_${Date.now()}.png`;
@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
 
       // Clean up signature from storage (after all processing is complete)
       if (signatureId) {
-        deleteSignature(signatureId);
+        await deleteSignature(signatureId);
         console.log("🧹 Signature cleaned up from storage");
       }
 
@@ -302,4 +302,3 @@ export async function POST(req: NextRequest) {
   // Return 200 for other event types
   return NextResponse.json({ received: true });
 }
-

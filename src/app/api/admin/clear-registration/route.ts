@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from 'fs';
-import path from 'path';
-
-const DB_DIR = path.join(process.cwd(), '.db');
-const REGISTRATIONS_FILE = path.join(DB_DIR, 'registrations.json');
+import { getAllRegistrations, deleteRegistration } from "@/lib/db/registrations";
 
 /**
  * Admin API: Delete a specific registration by email
@@ -34,24 +30,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Load registrations
-    let registrations: any[] = [];
-    if (fs.existsSync(REGISTRATIONS_FILE)) {
-      const data = fs.readFileSync(REGISTRATIONS_FILE, 'utf8');
-      registrations = JSON.parse(data);
-    }
-
+    // Load registrations from Vercel KV
+    const registrations = await getAllRegistrations();
     const initialCount = registrations.length;
     
-    // Filter out registrations with matching email
-    registrations = registrations.filter(
-      r => r.email.toLowerCase() !== email.toLowerCase()
+    // Find and delete registrations with matching email
+    const toDelete = registrations.filter(
+      r => r.email.toLowerCase() === email.toLowerCase()
     );
 
-    const deletedCount = initialCount - registrations.length;
+    for (const reg of toDelete) {
+      await deleteRegistration(reg.registrationId);
+    }
 
-    // Save updated registrations
-    fs.writeFileSync(REGISTRATIONS_FILE, JSON.stringify(registrations, null, 2), 'utf8');
+    const deletedCount = toDelete.length;
 
     console.log(`🗑️ Admin: Deleted ${deletedCount} registration(s) for ${email}`);
 
@@ -59,7 +51,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `Deleted ${deletedCount} registration(s) for ${email}`,
       deletedCount,
-      remainingCount: registrations.length,
+      remainingCount: initialCount - deletedCount,
     });
   } catch (error: any) {
     console.error("❌ Error clearing registration:", error);
@@ -99,17 +91,14 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Load current count
-    let registrations: any[] = [];
-    if (fs.existsSync(REGISTRATIONS_FILE)) {
-      const data = fs.readFileSync(REGISTRATIONS_FILE, 'utf8');
-      registrations = JSON.parse(data);
-    }
-
+    // Load all registrations from Vercel KV
+    const registrations = await getAllRegistrations();
     const deletedCount = registrations.length;
 
-    // Clear all registrations
-    fs.writeFileSync(REGISTRATIONS_FILE, '[]', 'utf8');
+    // Delete all registrations
+    for (const reg of registrations) {
+      await deleteRegistration(reg.registrationId);
+    }
 
     console.log(`🗑️ Admin: Cleared ALL ${deletedCount} registration(s)`);
 
@@ -126,4 +115,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-

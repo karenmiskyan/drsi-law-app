@@ -181,7 +181,7 @@ export async function findOrCreateClientFolder(
   try {
     // 1. Check if folder exists in database mapping
     console.log(`🔍 Searching for existing folder: ${email} / ${phone}`);
-    const existingMapping = findFolderByUser(email, phone);
+    const existingMapping = await findFolderByUser(email, phone);
 
     if (existingMapping) {
       console.log(`✅ Found existing folder mapping for: ${email}`);
@@ -220,7 +220,7 @@ export async function findOrCreateClientFolder(
     const folderLink = folderResponse.data.webViewLink || "";
 
     // 3. Save mapping to database
-    saveFolderMapping({
+    await saveFolderMapping({
       email,
       folderId: clientFolderId,
       folderName,
@@ -299,4 +299,3 @@ export async function uploadToDrive(
     throw new Error("Failed to upload file to Google Drive");
   }
 }
-

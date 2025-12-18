@@ -1,94 +1,64 @@
 /**
- * File-system based signature store
- * More reliable than in-memory store for development with hot reload
- * In production, use Redis or a database
+ * Vercel KV-based Signature Store
+ * 
+ * Uses Redis for persistent storage compatible with Vercel's read-only filesystem.
+ * Keys: signature:{id} - stores signature data with automatic expiration
  */
 
-import fs from "fs";
-import path from "path";
+import { kv } from "@vercel/kv";
 
 interface SignatureData {
   signature: string;
   timestamp: number;
 }
 
-const SIGNATURES_DIR = path.join(process.cwd(), ".signatures");
-const MAX_AGE = 60 * 60 * 1000; // 1 hour
+const SIGNATURE_KEY_PREFIX = "signature:";
+const MAX_AGE_SECONDS = 60 * 60; // 1 hour in seconds
 
-// Ensure signatures directory exists
-if (!fs.existsSync(SIGNATURES_DIR)) {
-  fs.mkdirSync(SIGNATURES_DIR, { recursive: true });
-}
-
-// Clean up old signatures on startup
-cleanupOldSignatures();
-
-// Clean up old signatures periodically
-setInterval(() => {
-  cleanupOldSignatures();
-}, 60 * 60 * 1000); // Every hour
-
-function cleanupOldSignatures(): void {
-  try {
-    const files = fs.readdirSync(SIGNATURES_DIR);
-    const now = Date.now();
-    
-    for (const file of files) {
-      if (!file.endsWith(".json")) continue;
-      
-      const filePath = path.join(SIGNATURES_DIR, file);
-      try {
-        const data = JSON.parse(fs.readFileSync(filePath, "utf-8")) as SignatureData;
-        
-        if (now - data.timestamp > MAX_AGE) {
-          fs.unlinkSync(filePath);
-          console.log("🧹 Cleaned up expired signature:", file);
-        }
-      } catch (error) {
-        // If file is corrupted, delete it
-        fs.unlinkSync(filePath);
-      }
-    }
-  } catch (error) {
-    console.error("Error cleaning up signatures:", error);
-  }
-}
-
-export function storeSignature(id: string, signature: string): void {
+/**
+ * Store a signature in Vercel KV
+ * @param id - Unique identifier for the signature
+ * @param signature - Base64 encoded signature data
+ */
+export async function storeSignature(id: string, signature: string): Promise<void> {
   try {
     const data: SignatureData = {
       signature,
       timestamp: Date.now(),
     };
-    
-    const filePath = path.join(SIGNATURES_DIR, `${id}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(data), "utf-8");
-    console.log("💾 Signature stored to file:", id);
+
+    // Store with automatic expiration (EX = expire in seconds)
+    await kv.set(`${SIGNATURE_KEY_PREFIX}${id}`, data, { ex: MAX_AGE_SECONDS });
+    console.log("💾 Signature stored in KV:", id);
   } catch (error) {
     console.error("❌ Failed to store signature:", error);
     throw error;
   }
 }
 
-export function getSignature(id: string): string | null {
+/**
+ * Retrieve a signature from Vercel KV
+ * @param id - Unique identifier for the signature
+ * @returns The signature string or null if not found/expired
+ */
+export async function getSignature(id: string): Promise<string | null> {
   try {
-    const filePath = path.join(SIGNATURES_DIR, `${id}.json`);
-    
-    if (!fs.existsSync(filePath)) {
-      console.log("⚠️ Signature file not found:", id);
+    const data = await kv.get<SignatureData>(`${SIGNATURE_KEY_PREFIX}${id}`);
+
+    if (!data) {
+      console.log("⚠️ Signature not found in KV:", id);
       return null;
     }
-    
-    const data = JSON.parse(fs.readFileSync(filePath, "utf-8")) as SignatureData;
-    
-    // Check if expired
-    if (Date.now() - data.timestamp > MAX_AGE) {
-      fs.unlinkSync(filePath);
+
+    // Check if manually expired (belt and suspenders with Redis TTL)
+    const maxAgeMs = MAX_AGE_SECONDS * 1000;
+    if (Date.now() - data.timestamp > maxAgeMs) {
+      await deleteSignature(id);
       console.log("⚠️ Signature expired:", id);
       return null;
     }
-    
-    console.log("✅ Signature retrieved from file:", id);
+
+    console.log("✅ Signature retrieved from KV:", id);
     return data.signature;
   } catch (error) {
     console.error("❌ Failed to retrieve signature:", error);
@@ -96,16 +66,59 @@ export function getSignature(id: string): string | null {
   }
 }
 
-export function deleteSignature(id: string): void {
+/**
+ * Delete a signature from Vercel KV
+ * @param id - Unique identifier for the signature
+ */
+export async function deleteSignature(id: string): Promise<void> {
   try {
-    const filePath = path.join(SIGNATURES_DIR, `${id}.json`);
-    
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log("🗑️ Signature file deleted:", id);
-    }
+    await kv.del(`${SIGNATURE_KEY_PREFIX}${id}`);
+    console.log("🗑️ Signature deleted from KV:", id);
   } catch (error) {
     console.error("❌ Failed to delete signature:", error);
   }
 }
 
+/**
+ * Get the count of stored signatures (for monitoring)
+ * Note: This scans keys which may be slow with many keys
+ */
+export async function getStoreSize(): Promise<number> {
+  try {
+    const keys = await kv.keys(`${SIGNATURE_KEY_PREFIX}*`);
+    return keys.length;
+  } catch (error) {
+    console.error("❌ Failed to get store size:", error);
+    return 0;
+  }
+}
+
+/**
+ * Manual cleanup function - not typically needed since Redis handles TTL
+ * @returns Number of signatures cleaned up
+ */
+export async function forceCleanup(): Promise<number> {
+  try {
+    const keys = await kv.keys(`${SIGNATURE_KEY_PREFIX}*`);
+    let cleaned = 0;
+    const now = Date.now();
+    const maxAgeMs = MAX_AGE_SECONDS * 1000;
+
+    for (const key of keys) {
+      const data = await kv.get<SignatureData>(key);
+      if (data && now - data.timestamp > maxAgeMs) {
+        await kv.del(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} expired signature(s)`);
+    }
+
+    return cleaned;
+  } catch (error) {
+    console.error("❌ Failed to cleanup signatures:", error);
+    return 0;
+  }
+}

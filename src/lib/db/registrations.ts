@@ -1,13 +1,13 @@
-import fs from 'fs';
-import path from 'path';
+/**
+ * Vercel KV-based Registration Store
+ * 
+ * Uses Redis for persistent storage compatible with Vercel's read-only filesystem.
+ * Keys:
+ * - registration:{id} - Individual registration data
+ * - registrations:index - Set of all registration IDs
+ */
 
-const DB_DIR = path.join(process.cwd(), '.db');
-const REGISTRATIONS_FILE = path.join(DB_DIR, 'registrations.json');
-
-// Ensure the .db directory exists
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR);
-}
+import { kv } from "@vercel/kv";
 
 export interface Registration {
   registrationId: string;
@@ -21,107 +21,187 @@ export interface Registration {
   used: boolean; // Token used flag
 }
 
-let registrations: Registration[] = [];
+const REGISTRATIONS_INDEX_KEY = "registrations:index";
+const REGISTRATION_KEY_PREFIX = "registration:";
 
-// Load registrations from file on startup
-try {
-  if (fs.existsSync(REGISTRATIONS_FILE)) {
-    const data = fs.readFileSync(REGISTRATIONS_FILE, 'utf8');
-    registrations = JSON.parse(data);
-    console.log(`📦 Loaded ${registrations.length} registrations from database`);
+/**
+ * Get a single registration by ID
+ */
+export async function getRegistration(id: string): Promise<Registration | null> {
+  try {
+    const registration = await kv.get<Registration>(`${REGISTRATION_KEY_PREFIX}${id}`);
+    return registration;
+  } catch (error) {
+    console.error("Error getting registration:", error);
+    return null;
   }
-} catch (error) {
-  console.error("Error loading registrations:", error);
 }
 
-// Save registrations to file
-const saveRegistrations = () => {
+/**
+ * Save a registration
+ */
+export async function saveRegistration(id: string, data: Registration): Promise<void> {
   try {
-    fs.writeFileSync(REGISTRATIONS_FILE, JSON.stringify(registrations, null, 2), 'utf8');
-    console.log(`💾 Saved ${registrations.length} registrations to database`);
+    await kv.set(`${REGISTRATION_KEY_PREFIX}${id}`, data);
+    // Add to index set
+    await kv.sadd(REGISTRATIONS_INDEX_KEY, id);
+    console.log(`💾 Saved registration: ${id}`);
   } catch (error) {
-    console.error("Error saving registrations:", error);
+    console.error("Error saving registration:", error);
+    throw error;
   }
-};
+}
+
+/**
+ * Get all registrations
+ */
+export async function getAllRegistrations(): Promise<Registration[]> {
+  try {
+    // Get all registration IDs from the index
+    const ids = await kv.smembers(REGISTRATIONS_INDEX_KEY);
+    
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    // Fetch all registrations in parallel
+    const registrations = await Promise.all(
+      ids.map(async (id) => {
+        const reg = await kv.get<Registration>(`${REGISTRATION_KEY_PREFIX}${id}`);
+        return reg;
+      })
+    );
+
+    // Filter out null values
+    return registrations.filter((r): r is Registration => r !== null);
+  } catch (error) {
+    console.error("Error getting all registrations:", error);
+    return [];
+  }
+}
 
 /**
  * Add a new registration
  */
-export function addRegistration(registration: Registration): void {
-  registrations.push(registration);
-  saveRegistrations();
+export async function addRegistration(registration: Registration): Promise<void> {
+  await saveRegistration(registration.registrationId, registration);
+}
+
+/**
+ * Delete a registration
+ */
+export async function deleteRegistration(id: string): Promise<void> {
+  try {
+    await kv.del(`${REGISTRATION_KEY_PREFIX}${id}`);
+    await kv.srem(REGISTRATIONS_INDEX_KEY, id);
+    console.log(`🗑️ Deleted registration: ${id}`);
+  } catch (error) {
+    console.error("Error deleting registration:", error);
+    throw error;
+  }
 }
 
 /**
  * Remove unused registration token (for regeneration)
  */
-export function removeUnusedRegistration(email: string, phone: string): void {
-  const oldLength = registrations.length;
-  registrations = registrations.filter(r => 
-    !((r.email.toLowerCase() === email.toLowerCase() || r.phone === phone) && !r.used)
-  );
-  if (registrations.length < oldLength) {
-    console.log(`🗑️ Removed unused token for ${email}`);
-    saveRegistrations();
+export async function removeUnusedRegistration(email: string, phone: string): Promise<void> {
+  try {
+    const allRegistrations = await getAllRegistrations();
+    
+    for (const reg of allRegistrations) {
+      if ((reg.email.toLowerCase() === email.toLowerCase() || reg.phone === phone) && !reg.used) {
+        await deleteRegistration(reg.registrationId);
+        console.log(`🗑️ Removed unused token for ${email}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error removing unused registration:", error);
   }
 }
 
 /**
  * Check if email or phone already has a submitted registration
  */
-export function hasExistingRegistration(email: string, phone: string): Registration | undefined {
-  return registrations.find(r => 
-    (r.email.toLowerCase() === email.toLowerCase() || r.phone === phone) && r.used
-  );
+export async function hasExistingRegistration(email: string, phone: string): Promise<Registration | undefined> {
+  try {
+    const allRegistrations = await getAllRegistrations();
+    
+    return allRegistrations.find(r => 
+      (r.email.toLowerCase() === email.toLowerCase() || r.phone === phone) && r.used
+    );
+  } catch (error) {
+    console.error("Error checking existing registration:", error);
+    return undefined;
+  }
 }
 
 /**
  * Verify and consume submission token (one-time use)
  */
-export function verifySubmissionToken(token: string, email: string, phone: string): boolean {
-  const registration = registrations.find(r => 
-    r.submissionToken === token && 
-    r.email.toLowerCase() === email.toLowerCase() &&
-    r.phone === phone &&
-    !r.used
-  );
-  
-  if (registration) {
-    // Mark token as used
-    registration.used = true;
-    saveRegistrations();
-    console.log(`✅ Submission token verified and consumed for ${email}`);
-    return true;
+export async function verifySubmissionToken(token: string, email: string, phone: string): Promise<boolean> {
+  try {
+    const allRegistrations = await getAllRegistrations();
+    
+    const registration = allRegistrations.find(r => 
+      r.submissionToken === token && 
+      r.email.toLowerCase() === email.toLowerCase() &&
+      r.phone === phone &&
+      !r.used
+    );
+    
+    if (registration) {
+      // Mark token as used
+      registration.used = true;
+      await saveRegistration(registration.registrationId, registration);
+      console.log(`✅ Submission token verified and consumed for ${email}`);
+      return true;
+    }
+    
+    console.warn(`❌ Invalid or already used submission token for ${email}`);
+    return false;
+  } catch (error) {
+    console.error("Error verifying submission token:", error);
+    return false;
   }
-  
-  console.warn(`❌ Invalid or already used submission token for ${email}`);
-  return false;
 }
 
 /**
  * Get registration by email
  */
-export function getRegistrationByEmail(email: string): Registration | undefined {
-  return registrations.find(r => r.email.toLowerCase() === email.toLowerCase());
-}
-
-/**
- * Get all registrations
- */
-export function getAllRegistrations(): Registration[] {
-  return [...registrations];
+export async function getRegistrationByEmail(email: string): Promise<Registration | undefined> {
+  try {
+    const allRegistrations = await getAllRegistrations();
+    return allRegistrations.find(r => r.email.toLowerCase() === email.toLowerCase());
+  } catch (error) {
+    console.error("Error getting registration by email:", error);
+    return undefined;
+  }
 }
 
 /**
  * Cleanup old unused tokens (older than 1 hour)
+ * Note: On Vercel, this should be called via a cron job or during API calls
  */
-setInterval(() => {
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  const oldLength = registrations.length;
-  registrations = registrations.filter(r => r.used || r.submittedAt > oneHourAgo);
-  if (registrations.length < oldLength) {
-    console.log(`🧹 Cleaned up ${oldLength - registrations.length} expired submission tokens`);
-    saveRegistrations();
-  }
-}, 60 * 60 * 1000); // Run every hour
+export async function cleanupExpiredRegistrations(): Promise<number> {
+  try {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const allRegistrations = await getAllRegistrations();
+    let cleaned = 0;
 
+    for (const reg of allRegistrations) {
+      if (!reg.used && reg.submittedAt < oneHourAgo) {
+        await deleteRegistration(reg.registrationId);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} expired submission tokens`);
+    }
+
+    return cleaned;
+  } catch (error) {
+    console.error("Error cleaning up expired registrations:", error);
+    return 0;
+  }
+}
