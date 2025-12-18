@@ -35,6 +35,13 @@ export function Step5Review() {
         setIsLoadingToken(true);
         setTokenError(null);
 
+        // Early return if applicantInfo is missing
+        if (!applicantInfo?.email) {
+          setTokenError("Missing applicant information. Please complete Step 1.");
+          setIsLoadingToken(false);
+          return;
+        }
+
         // 🔧 FIX: Check sessionStorage for existing token (survives React Strict Mode remounts)
         const sessionKey = `submission_token_${applicantInfo.email}`;
         const sessionTimeKey = `submission_token_time_${applicantInfo.email}`;
@@ -112,6 +119,12 @@ export function Step5Review() {
     // Prevent submission without token
     if (!submissionToken) {
       setTokenError("Submission token not ready. Please wait or refresh the page.");
+      return;
+    }
+
+    // Prevent submission without applicant info
+    if (!applicantInfo?.email) {
+      setTokenError("Missing applicant information. Please complete Step 1.");
       return;
     }
     setIsSubmitting(true);

@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { generateTestToken } from "@/lib/tokenVerification";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia" as any,
+  apiVersion: "2025-02-24.acacia" as any,
 });
 
 export async function GET(req: NextRequest) {

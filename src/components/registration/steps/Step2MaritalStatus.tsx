@@ -52,15 +52,18 @@ export function Step2MaritalStatus() {
     formState: { errors },
   } = useForm<SpouseInfoFormData>({
     resolver: showSpouseSection ? zodResolver(spouseInfoSchema) : undefined,
-    defaultValues: spouseInfo || {
+    defaultValues: (spouseInfo ? {
+      ...spouseInfo,
+      gender: spouseInfo.gender || undefined,
+    } : {
       fullName: "",
       dateOfBirth: { day: "", month: "", year: "" },
-      gender: "",
+      gender: undefined,
       cityOfBirth: "",
       countryOfBirth: "",
       educationLevel: "",
       isUSCitizenOrLPR: false,
-    },
+    }) as any,
   });
 
   // 🔧 FIX: Sync marital status from store
@@ -75,7 +78,10 @@ export function Step2MaritalStatus() {
   useEffect(() => {
     if (showSpouseSection && spouseInfo) {
       console.log("📝 Step 2: Syncing spouse form with store", spouseInfo);
-      reset(spouseInfo);
+      reset({
+        ...spouseInfo,
+        gender: spouseInfo.gender || undefined,
+      } as any);
     }
   }, [spouseInfo, showSpouseSection, reset]);
 

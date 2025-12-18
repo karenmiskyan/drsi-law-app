@@ -33,14 +33,22 @@ export function Step1ApplicantInfo() {
     formState: { errors },
   } = useForm<ApplicantInfoFormData>({
     resolver: zodResolver(applicantInfoSchema),
-    defaultValues: applicantInfo || undefined,
+    defaultValues: applicantInfo ? {
+      ...applicantInfo,
+      gender: applicantInfo.gender || undefined,
+      educationLevel: applicantInfo.educationLevel || undefined,
+    } as any : undefined,
   });
 
   // 🔧 FIX: Update form when store changes (e.g., browser back, token pre-fill)
   useEffect(() => {
     if (applicantInfo) {
       console.log("📝 Step 1: Syncing form with store", applicantInfo);
-      reset(applicantInfo);
+      reset({
+        ...applicantInfo,
+        gender: applicantInfo.gender || undefined,
+        educationLevel: applicantInfo.educationLevel || undefined,
+      } as any);
     }
   }, [applicantInfo, reset]);
 

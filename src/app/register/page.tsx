@@ -96,8 +96,6 @@ function RegistrationPageContent() {
           const registrationMaritalStatus = 
             userData.maritalStatus === "married_to_citizen" || userData.maritalStatus === "married_to_lpr"
               ? "married"
-              : userData.maritalStatus === "legally_separated"
-              ? "separated"
               : userData.maritalStatus;
           
           setMaritalStatus(registrationMaritalStatus);

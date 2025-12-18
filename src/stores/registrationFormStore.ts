@@ -26,7 +26,7 @@ export interface ApplicantInfo {
     | "";
   currentResidence: {
     streetAddress: string;
-    streetAddress2: string;
+    streetAddress2?: string;
     city: string;
     stateProvince: string;
     postalCode: string;

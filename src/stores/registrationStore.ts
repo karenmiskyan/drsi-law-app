@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { MaritalStatus } from "@/lib/pricing";
 
+// Re-export MaritalStatus for use in other files
+export type { MaritalStatus };
+
 export interface ContactInfo {
   firstName: string;
   lastName: string;
