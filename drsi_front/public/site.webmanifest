@@ -1,0 +1,29 @@
+{
+  "name": "DRSI Law — Family Immigration Petition",
+  "short_name": "DRSI Law",
+  "description": "Secure online application with D. R. Sklar & Associates Immigration Law Offices.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#142327",
+  "theme_color": "#142327",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180"
+    }
+  ]
+}
