@@ -36,15 +36,18 @@ jobs:
       - name: Build Vite frontend
         working-directory: drsi_front
         env:
-          # Production API URL (frontend and backend share the same domain)
           VITE_API_URL: https://apply.drsi-law.com/api
         run: npm run build
 
       - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+          # Sanity check the key parses
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Rsync Laravel backend
@@ -102,5 +105,4 @@ jobs:
         run: |
           set -e
           echo "Frontend:" && curl -sI "https://apply.drsi-law.com/?cb=$(date +%s)" | head -1
-          echo "API:"      && curl -sI "https://apply.drsi-law.com/api/user?cb=$(date +%s)" | head -1
           echo "Admin:"    && curl -sI "https://apply.drsi-law.com/admin?cb=$(date +%s)" | head -1
