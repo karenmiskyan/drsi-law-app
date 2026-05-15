@@ -182,9 +182,15 @@ class ApplicationController extends Controller
             'stage1_submitted_at' => now(),
         ]);
 
-        // Notify admin (Meir) about the new submission
-        $adminEmail = config('app.admin_email', 'meir@drsi.com');
-        Mail::to($adminEmail)->send(new Stage1SubmittedAdminMail($application));
+        // Notify admin (Meir) about the new submission — never fail the request if email is down
+        try {
+            $adminEmail = config('app.admin_email', 'meir@drsi-law.com');
+            Mail::to($adminEmail)->send(new Stage1SubmittedAdminMail($application));
+        } catch (\Throwable $e) {
+            \Log::warning('Admin notification email failed: ' . $e->getMessage(), [
+                'application_id' => $application->id,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Stage 1 submitted successfully.',
