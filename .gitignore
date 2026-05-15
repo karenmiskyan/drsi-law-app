@@ -1,0 +1,51 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies — never committed
+**/node_modules/
+**/vendor/
+**/.npm/
+
+# Builds — generated, not committed
+**/dist/
+**/build/
+**/.next/
+
+# Backend
+drsi_backend/.env
+drsi_backend/.env.backup-*
+drsi_backend/storage/app/private/
+drsi_backend/storage/logs/*.log
+drsi_backend/storage/framework/cache/*
+drsi_backend/storage/framework/sessions/*
+drsi_backend/storage/framework/views/*
+drsi_backend/storage/framework/testing/*
+drsi_backend/public/storage
+drsi_backend/public/build
+drsi_backend/auth.json
+
+# Local Vite envs (production env IS committed; .env is dev-only)
+drsi_front/.env.local
+
+# Lockfiles for non-installed runtimes (keep package-lock.json + composer.lock)
+
+# Misc
+.phpunit.result.cache
+.phpunit.cache/
+
+# Backend junk
+drsi_backend/Archive*.zip
+
+# Frontend local dev .env (commit .env.example only — devs make their own)
+drsi_front/.env

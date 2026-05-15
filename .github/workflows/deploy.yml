@@ -1,0 +1,106 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SSH_HOST: 162.55.81.242
+      SSH_USER: drsilaw
+      DEPLOY_DIR: /home/drsilaw/drsi-backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: drsi_front/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: drsi_front
+        run: npm ci --no-audit --no-fund
+
+      - name: Build Vite frontend
+        working-directory: drsi_front
+        env:
+          # Production API URL (frontend and backend share the same domain)
+          VITE_API_URL: https://apply.drsi-law.com/api
+        run: npm run build
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Rsync Laravel backend
+        run: |
+          rsync -avz --delete \
+            --exclude 'vendor/' \
+            --exclude 'node_modules/' \
+            --exclude '.env' \
+            --exclude '.env.backup-*' \
+            --exclude 'storage/app/private/' \
+            --exclude 'storage/logs/' \
+            --exclude 'storage/framework/cache/' \
+            --exclude 'storage/framework/sessions/' \
+            --exclude 'storage/framework/views/' \
+            --exclude 'public/storage' \
+            --exclude 'public/assets/' \
+            --exclude 'public/index.html' \
+            --exclude 'public/logo/' \
+            --exclude 'public/vite.svg' \
+            --exclude '.git/' \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            drsi_backend/ "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/"
+
+      - name: Rsync Vite dist into Laravel public/
+        run: |
+          rsync -avz \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            drsi_front/dist/ "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/public/"
+
+      - name: Composer install + migrations + cache (on server)
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" bash <<'REMOTE'
+            set -e
+            cd /home/drsilaw/drsi-backend
+            export PATH=$PATH:/usr/local/bin
+
+            echo ">>> composer install"
+            /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-progress 2>&1 | tail -10
+
+            echo ">>> migrate"
+            php artisan migrate --force 2>&1 | tail -10
+
+            echo ">>> cache configs"
+            php artisan config:cache 2>&1 | tail -1
+            php artisan route:cache 2>&1 | tail -1
+            php artisan view:cache 2>&1 | tail -1
+
+            echo ">>> fix permissions"
+            chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+
+            echo ">>> done at $(date)"
+          REMOTE
+
+      - name: Smoke test
+        run: |
+          set -e
+          echo "Frontend:" && curl -sI "https://apply.drsi-law.com/?cb=$(date +%s)" | head -1
+          echo "API:"      && curl -sI "https://apply.drsi-law.com/api/user?cb=$(date +%s)" | head -1
+          echo "Admin:"    && curl -sI "https://apply.drsi-law.com/admin?cb=$(date +%s)" | head -1
