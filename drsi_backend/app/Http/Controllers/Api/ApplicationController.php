@@ -218,9 +218,15 @@ class ApplicationController extends Controller
             'status' => 'stage2_submitted',
         ]);
 
-        // Notify admin about the Stage 2 submission
-        $adminEmail = config('app.admin_email', 'meir@drsi.com');
-        Mail::to($adminEmail)->send(new Stage2SubmittedAdminMail($application));
+        // Notify admin — never fail the request if email is down
+        try {
+            $adminEmail = config('app.admin_email', 'meir@drsi-law.com');
+            Mail::to($adminEmail)->send(new Stage2SubmittedAdminMail($application));
+        } catch (\Throwable $e) {
+            \Log::warning('Stage 2 admin notification email failed: ' . $e->getMessage(), [
+                'application_id' => $application->id,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Stage 2 documents submitted for review.',
