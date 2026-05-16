@@ -65,6 +65,14 @@ return [
             'transport' => 'resend',
         ],
 
+        // Brevo (HTTP API) — bridge mailer until the client provides SendGrid.
+        // Registered as a custom Symfony transport in AppServiceProvider::boot().
+        // Uses HTTP API (not SMTP) because the server's iptables blocks
+        // outbound SMTP ports 25/465/587.
+        'brevo' => [
+            'transport' => 'brevo',
+        ],
+
         'sendmail' => [
             'transport' => 'sendmail',
             'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),

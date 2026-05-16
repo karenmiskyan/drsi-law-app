@@ -13,7 +13,9 @@
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1",
         "phpoffice/phpword": "^1.4",
-        "resend/resend-laravel": "^1.4"
+        "resend/resend-laravel": "^1.4",
+        "symfony/brevo-mailer": "^8.0",
+        "symfony/http-client": "^8.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

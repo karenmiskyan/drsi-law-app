@@ -15,13 +15,25 @@ export function LoginPage() {
 
   const { setAuth } = useAuthStore();
 
+  // RFC-5322-ish practical email check (mirrors Laravel's `email` rule closely enough)
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const isValidEmail = EMAIL_RE.test(email.trim());
+
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    // Explicit client-side guard so the user always gets feedback.
+    // (Native type="email" validation can fail silently with custom inputs.)
+    if (!isValidEmail) {
+      setError('Please enter a valid email address (e.g. you@example.com).');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await sendOtp(email);
+      const res = await sendOtp(email.trim());
       setMessage(res.message);
       setStep('otp');
     } catch (err: unknown) {
@@ -107,7 +119,10 @@ export function LoginPage() {
                       type="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (error) setError('');
+                      }}
                       required
                       className="pl-10"
                       autoFocus
@@ -116,7 +131,7 @@ export function LoginPage() {
                 </div>
                 <Button
                   type="submit"
-                  disabled={loading || !email}
+                  disabled={loading || !isValidEmail}
                   className="w-full bg-[#b72b2b] hover:bg-[#a02525] text-white"
                 >
                   {loading ? (
