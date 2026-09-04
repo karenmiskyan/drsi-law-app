@@ -79,3 +79,6 @@ Login as the Filament admin user (created via `php artisan make:filament-user` o
 | `GET /api/application/document/{id}/view` | bearer | Inline preview of uploaded doc |
 | `POST /api/application/submit-stage-1` | bearer | Submit Stage 1 |
 | `POST /api/application/submit-stage-2` | bearer | Submit Stage 2 |
+
+
+<!-- Security scan triggered at 2026-09-04 13:03:57 -->
